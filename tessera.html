@@ -1,0 +1,634 @@
+<title>Tessera Software</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&family=DM+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Layout concept: one fixed WebGL canvas holds 1,000 cubes (tesserae). Text panels scroll over it and alternate sides while the cubes re-form for each section: lattice, sphere, helix, wall, solid cube. Square corners throughout, like tiles. */
+:root {
+  --ground: #0A1038;
+  --ground-soft: #121A52;
+  --ivory: #F2EEE3;
+  --mist: #B4B9DC;
+  --saffron: #FFB81F;
+  --line: rgba(242, 238, 227, 0.18);
+  --panel: rgba(10, 16, 56, 0.8);
+  --f-display: 'Archivo', 'Arial Narrow', Arial, sans-serif;
+  --f-body: 'Instrument Sans', 'Helvetica Neue', Arial, sans-serif;
+  --f-mono: 'DM Mono', ui-monospace, Menlo, Consolas, monospace;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--ground);
+  color: var(--ivory);
+  font-family: var(--f-body);
+  font-size: 1.0625rem;
+  line-height: 1.6;
+  padding-block: 0;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0 0 auto;
+  height: env(safe-area-inset-top, 0px);
+  z-index: 10;
+  background: var(--ground);
+}
+
+#scene {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+  display: block;
+}
+
+main, footer { position: relative; z-index: 1; }
+
+a { color: inherit; }
+:focus-visible { outline: 2px solid var(--saffron); outline-offset: 3px; }
+
+.wrap { max-width: 1240px; margin-inline: auto; }
+.mono {
+  font-family: var(--f-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--mist);
+}
+
+/* Header */
+.site {
+  position: sticky;
+  top: env(safe-area-inset-top, 0px);
+  z-index: 9;
+  margin-left: calc(-1 * max(16px, env(safe-area-inset-left, 0px)));
+  margin-right: calc(-1 * max(16px, env(safe-area-inset-right, 0px)));
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  background: rgba(10, 16, 56, 0.74);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--line);
+}
+.bar {
+  max-width: 1240px;
+  margin-inline: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-block: 0.8rem;
+}
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  text-decoration: none;
+  font-family: var(--f-display);
+  font-weight: 800;
+  font-stretch: 118%;
+  font-size: 1.15rem;
+  letter-spacing: 0.01em;
+}
+.brand svg { width: 24px; height: 24px; display: block; }
+.nav { display: flex; align-items: center; gap: 1.6rem; }
+.nav a {
+  font-family: var(--f-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: var(--mist);
+}
+.nav a:hover { color: var(--ivory); }
+.nav a.btn-sm {
+  color: var(--ground);
+  background: var(--saffron);
+  padding: 0.55rem 0.9rem;
+  font-weight: 500;
+}
+.nav a.btn-sm:hover { color: var(--ground); background: #ffc94d; }
+
+/* Sections */
+.sec { padding-block: clamp(4rem, 12vh, 8.5rem); }
+.sec.hero { padding-block: clamp(3rem, 9vh, 6rem) clamp(4rem, 10vh, 7rem); }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; }
+.panel { grid-column: 1; max-width: 35rem; min-width: 0; text-shadow: 0 1px 14px rgba(10, 16, 56, 0.9); }
+.right .panel { grid-column: 2; }
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin: 0 0 1.25rem;
+}
+.eyebrow::before {
+  content: "";
+  width: 0.55rem;
+  height: 0.55rem;
+  background: var(--saffron);
+  display: block;
+}
+
+h1, h2, h3 {
+  font-family: var(--f-display);
+  font-weight: 800;
+  text-wrap: balance;
+  margin: 0;
+}
+h1 {
+  font-stretch: 112%;
+  font-size: clamp(2.4rem, 5vw, 4.4rem);
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+h2 {
+  font-stretch: 112%;
+  font-size: clamp(1.9rem, 3.6vw, 3.05rem);
+  line-height: 1.05;
+  letter-spacing: -0.015em;
+}
+h3 { font-weight: 700; font-stretch: 108%; font-size: 1.2rem; line-height: 1.2; }
+.lede { font-size: 1.15rem; color: var(--mist); margin: 1.5rem 0 0; max-width: 32rem; }
+.lede strong { color: var(--ivory); font-weight: 500; }
+p { margin: 0; }
+
+.actions { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 2rem; }
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.85rem 1.3rem;
+  font-family: var(--f-mono);
+  font-size: 0.8rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: var(--ivory);
+  background: transparent;
+  border: 1px solid var(--ivory);
+  border-radius: 0;
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+.btn:hover { transform: translateY(-2px); background: rgba(242, 238, 227, 0.1); }
+.btn.primary { background: var(--saffron); border-color: var(--saffron); color: var(--ground); font-weight: 500; }
+.btn.primary:hover { background: #ffc94d; }
+
+.facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem 1.5rem;
+  margin: 3rem 0 0;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--line);
+}
+.facts div { display: flex; flex-direction: column-reverse; gap: 0.2rem; }
+.facts dt { font-family: var(--f-mono); font-size: 0.7rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--mist); line-height: 1.4; }
+.facts dd { margin: 0; font-family: var(--f-display); font-weight: 800; font-stretch: 112%; font-size: 1.7rem; line-height: 1.1; font-variant-numeric: tabular-nums; }
+
+/* Lists */
+.rows { list-style: none; margin: 2.25rem 0 0; padding: 0; }
+.rows > li { border-top: 1px solid var(--line); padding: 1.2rem 0; }
+.rows > li:last-child { border-bottom: 1px solid var(--line); }
+.rows p { color: var(--mist); margin-top: 0.45rem; }
+.row-h { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0.25rem 1rem; }
+
+.steps > li { display: grid; grid-template-columns: 5.5rem minmax(0, 1fr); gap: 1rem; }
+.steps .mono { padding-top: 0.3rem; color: var(--saffron); }
+
+.metric {
+  font-family: var(--f-display);
+  font-weight: 800;
+  font-stretch: 112%;
+  font-size: 1.9rem;
+  line-height: 1.1;
+  margin-top: 0.7rem;
+  color: var(--ivory) !important;
+  font-variant-numeric: tabular-nums;
+}
+.metric span { color: var(--saffron); }
+
+/* Contact */
+.mail-row { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; margin-top: 2rem; }
+.mail {
+  font-family: var(--f-display);
+  font-weight: 700;
+  font-stretch: 108%;
+  font-size: clamp(1.15rem, 2.4vw, 1.6rem);
+  user-select: all;
+  -webkit-user-select: all;
+  overflow-wrap: anywhere;
+}
+.status { min-height: 1.4em; margin-top: 0.75rem; }
+
+footer { border-top: 1px solid var(--line); background: rgba(10, 16, 56, 0.85); margin-left: calc(-1 * max(16px, env(safe-area-inset-left, 0px))); margin-right: calc(-1 * max(16px, env(safe-area-inset-right, 0px))); padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.foot { max-width: 1240px; margin-inline: auto; padding-block: 1.5rem; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.5rem 2rem; }
+
+@media (max-width: 860px) {
+  .grid { grid-template-columns: 1fr; }
+  .panel, .right .panel {
+    grid-column: 1;
+    max-width: none;
+    background: var(--panel);
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+    padding: 1.4rem;
+    text-shadow: none;
+  }
+  .hero .panel { background: rgba(10, 16, 56, 0.62); }
+  .nav a:not(.btn-sm) { display: none; }
+  .facts dd { font-size: 1.35rem; }
+}
+@media (max-width: 420px) {
+  .steps > li { grid-template-columns: 1fr; gap: 0.2rem; }
+  .facts { grid-template-columns: 1fr 1fr; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .btn { transition: none; }
+}
+</style>
+
+<canvas id="scene" aria-hidden="true"></canvas>
+
+<header class="site">
+  <div class="bar">
+    <a class="brand" href="#top" aria-label="Tessera Software, back to top">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <polygon points="12,2 21,7 12,12 3,7" fill="#F2EEE3"/>
+        <polygon points="3,7 12,12 12,22 3,17" fill="#8E9AD6"/>
+        <polygon points="21,7 12,12 12,22 21,17" fill="#FFB81F"/>
+      </svg>
+      Tessera
+    </a>
+    <nav class="nav" aria-label="Primary">
+      <a href="#services">Services</a>
+      <a href="#process">Process</a>
+      <a href="#work">Work</a>
+      <a class="btn-sm" href="#contact">Contact</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <section class="sec hero left" id="top" data-form="0">
+    <div class="wrap grid">
+      <div class="panel">
+        <p class="eyebrow mono">Product engineering studio</p>
+        <h1>Software assembled piece by piece.</h1>
+        <p class="lede">Tessera is a 42-person studio that designs, builds and runs the software mid-size companies depend on. <strong>From the first prototype to the 3 a.m. pager.</strong></p>
+        <div class="actions">
+          <a class="btn primary" href="#contact">Start a project</a>
+          <a class="btn" href="#work">See our work</a>
+        </div>
+        <dl class="facts">
+          <div><dt>Years in business</dt><dd>11</dd></div>
+          <div><dt>Products launched</dt><dd>140+</dd></div>
+          <div><dt>Median uptime, managed systems</dt><dd>99.97%</dd></div>
+        </dl>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec right" id="services" data-form="1">
+    <div class="wrap grid">
+      <div class="panel">
+        <p class="eyebrow mono">Services</p>
+        <h2>Four disciplines, one team.</h2>
+        <p class="lede">You work with the same engineers and designers from kickoff to launch, so nothing gets lost between handoffs.</p>
+        <ul class="rows">
+          <li>
+            <div class="row-h"><h3>Product engineering</h3><span class="mono">Web · Mobile · APIs</span></div>
+            <p>New products and rebuilds of old ones, shipped in two-week increments with a working demo at the end of each.</p>
+          </li>
+          <li>
+            <div class="row-h"><h3>Platform and cloud</h3><span class="mono">AWS · GCP · Kubernetes</span></div>
+            <p>Infrastructure as code, deploys that take minutes, and service-level objectives your on-call team can actually meet.</p>
+          </li>
+          <li>
+            <div class="row-h"><h3>Data and AI</h3><span class="mono">Pipelines · Search · LLMs</span></div>
+            <p>Event streams, warehouses and models that earn their place, with evaluation sets that show whether they work.</p>
+          </li>
+          <li>
+            <div class="row-h"><h3>Design systems</h3><span class="mono">Tokens · Components</span></div>
+            <p>One library of tested components, so ten teams ship screens that look and behave like one product.</p>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec left" id="process" data-form="2">
+    <div class="wrap grid">
+      <div class="panel">
+        <p class="eyebrow mono">Process</p>
+        <h2>From first sketch to on-call.</h2>
+        <p class="lede">A typical engagement runs in four stages. Scope and price are fixed at the end of the first one.</p>
+        <ul class="rows steps">
+          <li>
+            <span class="mono">Weeks 0–2</span>
+            <div><h3>Discover</h3><p>Interviews with users and the people who run the current system. You get a written scope, a risk list and a price.</p></div>
+          </li>
+          <li>
+            <span class="mono">Weeks 2–4</span>
+            <div><h3>Prototype</h3><p>A clickable prototype in ten working days, tested with five real users before any production code is written.</p></div>
+          </li>
+          <li>
+            <span class="mono">Weeks 4–20</span>
+            <div><h3>Build</h3><p>Two-week increments with a demo every other Friday. Every merge is deployed to a staging environment you can open.</p></div>
+          </li>
+          <li>
+            <span class="mono">Ongoing</span>
+            <div><h3>Operate</h3><p>Monitoring, incident response and quarterly reviews. Or a documented handover, if you would rather run it yourself.</p></div>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec right" id="work" data-form="3">
+    <div class="wrap grid">
+      <div class="panel">
+        <p class="eyebrow mono">Selected work</p>
+        <h2>Systems people rely on.</h2>
+        <ul class="rows">
+          <li>
+            <div class="row-h"><h3>Harbourline Freight</h3><span class="mono">Logistics</span></div>
+            <p class="metric">41 min <span>→</span> 3 min</p>
+            <p>Route planning rebuilt on event streams. Nightly planning for 2.1 million monthly shipments now finishes before the first shift.</p>
+          </li>
+          <li>
+            <div class="row-h"><h3>Northgate Clinics</h3><span class="mono">Healthcare</span></div>
+            <p class="metric">38% <span>↓</span> missed visits</p>
+            <p>A patient intake app that replaced paper forms across 64 clinics, with reminders and one-tap rescheduling.</p>
+          </li>
+          <li>
+            <div class="row-h"><h3>Oakmere Bank</h3><span class="mono">Financial services</span></div>
+            <p class="metric">6 weeks <span>→</span> 4 days</p>
+            <p>A design system of 212 components that cut the release cycle for eleven product teams.</p>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec left" id="contact" data-form="4">
+    <div class="wrap grid">
+      <div class="panel">
+        <p class="eyebrow mono">Contact</p>
+        <h2>Tell us what you're assembling.</h2>
+        <p class="lede">Send a short note about the product, the deadline and the team you have today. A senior engineer replies within one business day.</p>
+        <div class="mail-row">
+          <span class="mail" id="mail">hello@tessera.example</span>
+          <button class="btn primary" type="button" id="copy">Copy address</button>
+        </div>
+        <p class="status mono" id="status" role="status" aria-live="polite"></p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="foot">
+    <span class="mono">© 2026 Tessera Software Ltd.</span>
+    <span class="mono">Product engineering · Platform · Data · Design systems</span>
+  </div>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function () {
+  var canvas = document.getElementById('scene');
+  var THREE = window.THREE;
+  var renderer;
+  try {
+    if (!THREE) throw new Error('three not loaded');
+    renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, powerPreference: 'high-performance' });
+  } catch (err) {
+    canvas.hidden = true;
+    return;
+  }
+
+  var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var N = 1000, FORMS = 5;
+  var GROUND = 0x0A1038;
+
+  renderer.setClearColor(GROUND, 1);
+  var scene = new THREE.Scene();
+  scene.fog = new THREE.Fog(GROUND, 38, 78);
+  var CAM_Z = 38, FOV = 38;
+  var camera = new THREE.PerspectiveCamera(FOV, 1, 0.1, 200);
+  camera.position.set(0, 0, CAM_Z);
+
+  scene.add(new THREE.AmbientLight(0xaab4ff, 0.6));
+  var sun = new THREE.DirectionalLight(0xfff2da, 1.15);
+  sun.position.set(10, 14, 12);
+  scene.add(sun);
+  var warm = new THREE.PointLight(0xffb81f, 1.0, 70);
+  warm.position.set(-12, -6, 12);
+  scene.add(warm);
+
+  var group = new THREE.Group();
+  scene.add(group);
+
+  function mulberry32(a) {
+    return function () {
+      a |= 0; a = a + 0x6D2B79F5 | 0;
+      var t = Math.imul(a ^ a >>> 15, 1 | a);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+  var rnd = mulberry32(20261030);
+
+  var pos = [], scl = [], f, i;
+  for (f = 0; f < FORMS; f++) { pos.push(new Float32Array(N * 3)); scl.push(new Float32Array(N)); }
+  function put(form, idx, x, y, z, s) {
+    var p = pos[form];
+    p[idx * 3] = x; p[idx * 3 + 1] = y; p[idx * 3 + 2] = z;
+    scl[form][idx] = s;
+  }
+
+  var dirs = new Float32Array(N * 3), spin = new Float32Array(N * 3), stag = new Float32Array(N);
+  var palette = [0xF2EEE3, 0x8E9AD6, 0x3D4BB0, 0xFFB81F];
+  var geo = new THREE.BoxGeometry(1, 1, 1);
+  var mat = new THREE.MeshStandardMaterial({ roughness: 0.42, metalness: 0.12 });
+  var mesh = new THREE.InstancedMesh(geo, mat, N);
+  mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  mesh.frustumCulled = false;
+  group.add(mesh);
+  var color = new THREE.Color();
+
+  for (i = 0; i < N; i++) {
+    var gx = i % 10, gy = Math.floor(i / 10) % 10, gz = Math.floor(i / 100);
+
+    // 0: lattice
+    put(0, i, (gx - 4.5) * 1.6, (gy - 4.5) * 1.6, (gz - 4.5) * 1.6, 0.55 + rnd() * 0.35);
+
+    // 1: sphere shell (Fibonacci spiral)
+    var yy = 1 - 2 * (i + 0.5) / N, rr = Math.sqrt(1 - yy * yy), th = i * 2.399963;
+    put(1, i, 9.6 * rr * Math.cos(th), 9.6 * yy, 9.6 * rr * Math.sin(th), 0.5 + rnd() * 0.3);
+
+    // 2: double helix with rungs
+    var t = i / N, ang = t * Math.PI * 9, hy = (t - 0.5) * 21, rad = 5.4, a2 = ang;
+    if (i % 5 === 4) { rad = rnd() * 5.4; } else if (i % 2) { a2 = ang + Math.PI; }
+    put(2, i, Math.cos(a2) * rad + (rnd() - 0.5) * 0.4, hy + (rnd() - 0.5) * 0.4, Math.sin(a2) * rad + (rnd() - 0.5) * 0.4, 0.5 + rnd() * 0.15);
+
+    // 3: rolling wall
+    var wx = i % 40, wy = Math.floor(i / 40);
+    put(3, i, (wx - 19.5) * 0.56, (wy - 12) * 0.56, Math.sin(wx * 0.32) * 1.8 + Math.cos(wy * 0.45) * 1.5, 0.5);
+
+    // 4: solid cube
+    put(4, i, (gx - 4.5) * 1.02, (gy - 4.5) * 1.02, (gz - 4.5) * 1.02, 0.97);
+
+    var dx = rnd() - 0.5, dy = rnd() - 0.5, dz = rnd() - 0.5, dl = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1;
+    dirs[i * 3] = dx / dl; dirs[i * 3 + 1] = dy / dl; dirs[i * 3 + 2] = dz / dl;
+    spin[i * 3] = (rnd() - 0.5) * 3; spin[i * 3 + 1] = (rnd() - 0.5) * 3; spin[i * 3 + 2] = (rnd() - 0.5) * 3;
+    stag[i] = rnd();
+
+    var pick = rnd();
+    color.setHex(pick < 0.06 ? palette[3] : pick < 0.25 ? palette[2] : pick < 0.6 ? palette[1] : palette[0]);
+    mesh.setColorAt(i, color);
+  }
+  mesh.instanceColor.needsUpdate = true;
+
+  var dummy = new THREE.Object3D();
+  function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
+  function smooth(v) { return v * v * (3 - 2 * v); }
+
+  function shape(form, t) {
+    var A = pos[form], B = pos[form + 1], SA = scl[form], SB = scl[form + 1];
+    for (var k = 0; k < N; k++) {
+      var local = clamp(t * 1.7 - stag[k] * 0.7, 0, 1);
+      var e = smooth(local);
+      var arc = Math.sin(Math.PI * e) * (0.9 + stag[k] * 2.2);
+      var k3 = k * 3;
+      dummy.position.set(
+        A[k3] + (B[k3] - A[k3]) * e + dirs[k3] * arc,
+        A[k3 + 1] + (B[k3 + 1] - A[k3 + 1]) * e + dirs[k3 + 1] * arc,
+        A[k3 + 2] + (B[k3 + 2] - A[k3 + 2]) * e + dirs[k3 + 2] * arc
+      );
+      var tumble = Math.sin(Math.PI * e);
+      dummy.rotation.set(spin[k3] * tumble, spin[k3 + 1] * tumble, spin[k3 + 2] * tumble);
+      dummy.scale.setScalar(SA[k] + (SB[k] - SA[k]) * e);
+      dummy.updateMatrix();
+      mesh.setMatrixAt(k, dummy.matrix);
+    }
+    mesh.instanceMatrix.needsUpdate = true;
+  }
+
+  // Per-formation placement of the whole group
+  var offFrac = [0.24, -0.25, 0.24, -0.27, 0.24];
+  var baseYaw = [0.5, 0, 0, -0.4, 0.4];
+
+  var sections = Array.prototype.slice.call(document.querySelectorAll('[data-form]'));
+  var centers = [];
+  function measure() {
+    centers = sections.map(function (s) {
+      var r = s.getBoundingClientRect();
+      return r.top + window.pageYOffset + r.height / 2;
+    });
+  }
+
+  var vw = 1, vh = 1, aspect = 1;
+  function resize() {
+    vw = window.innerWidth; vh = window.innerHeight; aspect = vw / vh;
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, vw < 700 ? 1.5 : 2));
+    renderer.setSize(vw, vh, false);
+    camera.aspect = aspect;
+    camera.updateProjectionMatrix();
+    measure();
+  }
+  window.addEventListener('resize', resize);
+  if (window.ResizeObserver) new ResizeObserver(measure).observe(document.body);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(measure);
+  resize();
+
+  function target() {
+    var cur = window.pageYOffset + vh * 0.5;
+    if (!centers.length || cur <= centers[0]) return 0;
+    var last = centers.length - 1;
+    if (cur >= centers[last]) return last;
+    var j = 0;
+    while (j < last && cur >= centers[j + 1]) j++;
+    var t = (cur - centers[j]) / (centers[j + 1] - centers[j]);
+    return j + clamp((t - 0.22) / 0.56, 0, 1);
+  }
+
+  var px = 0, py = 0, spx = 0, spy = 0;
+  window.addEventListener('pointermove', function (e) {
+    px = (e.clientX / window.innerWidth) * 2 - 1;
+    py = (e.clientY / window.innerHeight) * 2 - 1;
+  }, { passive: true });
+
+  var disp = 0, lastDisp = -1;
+  var start = performance.now();
+
+  function frame(now) {
+    requestAnimationFrame(frame);
+    var tgt = target();
+    disp += (tgt - disp) * (reduced ? 1 : 0.075);
+    if (Math.abs(tgt - disp) < 0.0005) disp = tgt;
+
+    var form = Math.min(Math.floor(disp), FORMS - 2);
+    var t = disp - form;
+    if (Math.abs(disp - lastDisp) > 0.0002) {
+      shape(form, t);
+      lastDisp = disp;
+    }
+
+    var h = 2 * CAM_Z * Math.tan((FOV * Math.PI / 180) / 2);
+    var w = h * aspect;
+    var narrow = aspect < 0.95;
+    var s = smooth(t);
+    var off = offFrac[form] + (offFrac[form + 1] - offFrac[form]) * s;
+    var yaw = baseYaw[form] + (baseYaw[form + 1] - baseYaw[form]) * s;
+    var fit = aspect < 1.1 ? Math.max(0.6, aspect * 0.9) : 1;
+
+    var secs = (now - start) / 1000;
+    spx += (px - spx) * 0.05;
+    spy += (py - spy) * 0.05;
+
+    group.position.x = narrow ? 0 : off * w;
+    group.scale.setScalar(fit);
+    group.rotation.y = yaw + (reduced ? 0 : Math.sin(secs * 0.3) * 0.35) + spx * 0.3;
+    group.rotation.x = spy * 0.16 + (form === 1 && !reduced ? Math.sin(secs * 0.22) * 0.08 : 0);
+
+    renderer.render(scene, camera);
+  }
+  requestAnimationFrame(frame);
+})();
+
+(function () {
+  var btn = document.getElementById('copy');
+  var mail = document.getElementById('mail');
+  var status = document.getElementById('status');
+  function select() {
+    var r = document.createRange();
+    r.selectNodeContents(mail);
+    var sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(r);
+    status.textContent = 'Address selected. Press Ctrl+C or Cmd+C to copy.';
+  }
+  btn.addEventListener('click', function () {
+    var text = mail.textContent.trim();
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () {
+          status.textContent = 'Copied ' + text;
+        }, select);
+      } else { select(); }
+    } catch (e) { select(); }
+  });
+})();
+</script>
